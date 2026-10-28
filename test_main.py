@@ -65,3 +65,27 @@ def test_unknown_kid_rejected():
     response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 401
     assert "Unknown signing key" in response.json()["detail"]
+
+from unittest.mock import patch
+
+def test_valid_token_accepted():
+    """5. Валидный токен (замоканная проверка) возвращает 200."""
+    fake_claims = {
+        "sub": "123",
+        "preferred_username": "testuser",
+        "realm_access": {"roles": ["iam-user"]},
+        "resource_access": {},
+        "iss": ISSUER
+    }
+    
+    # Мокаем функцию проверки токена, чтобы она возвращала валидные claims
+    with patch("main.decode_and_verify_token", return_value=fake_claims):
+        response = client.get(
+            "/me",
+            headers={"Authorization": "Bearer fake_valid_token"}
+        )
+        
+    assert response.status_code == 200
+    data = response.json()
+    assert data["username"] == "testuser"
+    assert "iam-user" in data["roles"]
