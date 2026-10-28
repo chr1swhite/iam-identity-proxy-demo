@@ -101,10 +101,26 @@ def login(req: LoginRequest):
         resp = requests.post(TOKEN_URL, data=payload, timeout=10)
         resp.raise_for_status()
     except requests.exceptions.HTTPError:
-        error_detail = resp.json() if resp.content else {"error": "Keycloak error"}
-        raise HTTPException(status_code=resp.status_code, detail=error_detail)
+        # Keycloak вернул 4xx/5xx. Не пробрасываем его тело клиенту напрямую.
+        # Пытаемся извлечь детали для логов, но клиенту отдаем безопасный формат.
+        try:
+            keycloak_error = resp.json()
+            error_desc = keycloak_error.get("error_description", "Authentication failed")
+        except ValueError:
+            # Если Keycloak вернул не JSON (например, HTML-ошибку от прокси)
+            error_desc = "Authentication failed due to provider error"
+            
+        # В проде здесь был бы logger.error(f"Keycloak auth error: {resp.status_code}, {error_desc}")
+        raise HTTPException(
+            status_code=401, 
+            detail={"error": "invalid_credentials", "message": error_desc}
+        )
     except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"Keycloak unreachable: {e}")
+        # Ошибки сети (Keycloak недоступен)
+        raise HTTPException(
+            status_code=502, 
+            detail={"error": "identity_provider_unavailable", "message": "Identity provider is unreachable"}
+        )
 
     data = resp.json()
     return {
