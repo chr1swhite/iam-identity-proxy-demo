@@ -242,3 +242,8 @@ curl -X GET http://localhost:8000/me \
     следует использовать secret manager, Vault или Kubernetes Secrets.
 -   **TLS:** в демо используется HTTP без TLS. В production нужна
     TLS-терминация на ingress/gateway.
+    **Конфигурация Keycloak**: start-dev и admin/admin используются только для локального запуска. В проде — start (production mode), HTTPS и сгенерированные пароли.
+    **RBAC**: реализовано извлечение ролей (identity-контекст). Полноценная проверка прав (например, if 'admin' not in roles: raise 403) вынесена за рамки демо, так как это ответственность бизнес-логики сервиса, а не IAM-прокси.
+    **Rate limiting**: в проде на /login нужен rate limiter (например, slowapi или защита на уровне Nginx/API Gateway), чтобы предотвратить брутфорс.
+## 9. Тесты: pytest — проверка отклонения поддельных токенов.
+(Запуск: pip install -r requirements.txt && pytest)

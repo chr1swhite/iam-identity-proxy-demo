@@ -70,7 +70,7 @@ def decode_and_verify_token(token: str) -> dict:
             public_key,
             algorithms=[key_data.get("alg", "RS256")],
             issuer=ISSUER,
-            options={"verify_aud": False},  # aud у Keycloak — 'account', не наш client_id
+            options={"verify_aud": False},  # Keycloak ставит aud='account'. В проде нужен Protocol Mapper и строгая проверка.
         )
     except JWTError as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
