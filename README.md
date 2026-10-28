@@ -1,5 +1,8 @@
 A minimal FastAPI proxy for Keycloak demonstrating JWT validation, RBAC, and secret isolation.
 
+# Interactive API Docs (Swagger UI)
+Static API Docs (GitHub Pages): https://chr1swhite.github.io/iam-identity-proxy-demo/index.html
+
 # IAM Proxy Service (Keycloak Integration Demo)
 
 ## Концепция
