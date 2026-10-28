@@ -1,7 +1,7 @@
 # IAM Proxy Service --- Keycloak Integration Demo
 
-A minimal FastAPI proxy for Keycloak demonstrating JWT validation, RBAC,
-and secret isolation.
+> Прототип IAM-прокси для демонстрации интеграции с Keycloak, валидации JWT и извлечения ролей (identity context).
+> **Не является полноценной системой авторизации (RBAC enforcement).**
 
 ## Interactive API Documentation
 
@@ -97,9 +97,7 @@ IAM Proxy (FastAPI)  <--- отдает токен клиенту
 -   Эндпоинт `POST /login`: проброс `grant_type=password` в Keycloak с
     обогащением запроса `client_id` и `client_secret` на стороне прокси.
     Секрет не уходит клиенту.
--   Эндпоинт `GET /me`: валидация подписи JWT по JWKS Keycloak (RS256),
-    проверка `iss`, извлечение `sub`, `preferred_username`, ролей из
-    `realm_access` и `resource_access`.
+-   Эндпоинт `GET /me`: валидация подписи JWT по JWKS Keycloak (RS256), проверка `iss`, извлечение `sub`, `preferred_username` и **извлечение ролей** (identity-контекст) для передачи бизнес-логике.
 -   **Изоляция секретов:** все параметры подключения и `client_secret`
     читаются из переменных окружения.
 -   Интерактивная документация Swagger UI с поддержкой авторизации по
@@ -243,7 +241,18 @@ curl -X GET http://localhost:8000/me \
 -   **TLS:** в демо используется HTTP без TLS. В production нужна
     TLS-терминация на ingress/gateway.
 -   **Конфигурация Keycloak**: start-dev и admin/admin используются только для локального запуска. В проде — start (production mode), HTTPS и сгенерированные пароли.
--   **RBAC**: реализовано извлечение ролей (identity-контекст). Полноценная проверка прав (например, if 'admin' not in roles: raise 403) вынесена за рамки демо, так как это ответственность бизнес-логики сервиса, а не IAM-прокси.
- -  **Rate limiting**: в проде на /login нужен rate limiter (например, slowapi или защита на уровне Nginx/API Gateway), чтобы предотвратить брутфорс.
-## 9. Тесты: pytest — проверка отклонения поддельных токенов.
-(Запуск: pip install -r requirements.txt && pytest)
+- **RBAC (enforcement)**: прокси извлекает роли, но не блокирует доступ к бизнес-операциям (нет проверки `if 'admin' not in roles: raise 403`). Это задача сервисов, стоящих за прокси.
+- **Rate limiting**: эндпоинт `/login` не защищён от брутфорса. В проде — обязателен rate limiter на уровне API Gateway или Nginx.
+- **Проверка aud**: отключена (`verify_aud: False`), так как Keycloak по умолчанию ставит `aud: account`. В проде — настройка Protocol Mapper и строгая проверка.
+
+## 9. Тестирование
+В проекте реализованы тесты (pytest), подтверждающие корректность обработки негативных сценариев:
+
+```bash
+pytest test_main.py -v
+
+Проверяется:
+-   Отказ при отсутствии токена (403).
+-   Отказ при невалидном формате токена (Malformed token, 401).
+-   Отказ при неправильном issuer (401).
+-   Отказ при неизвестном kid (401).
