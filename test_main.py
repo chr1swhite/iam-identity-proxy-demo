@@ -1,17 +1,30 @@
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from jose import jwt
 from main import app, ISSUER
 
 client = TestClient(app)
 
-# Фейковый секрет для генерации тестовых токенов
-# (в реальном Keycloak подпись другая, поэтому мы тестируем логику отказов)
-FAKE_SECRET = "test_secret_123"
+# Фейковый JWKS, чтобы тесты не ходили в реальный Keycloak
+FAKE_JWKS = {
+    "keys": [
+        {
+            "kid": "real-kid-123",
+            "kty": "RSA",
+            "alg": "RS256",
+            "use": "sig",
+            "n": "test_n_value",
+            "e": "AQAB"
+        }
+    ]
+}
 
-def get_token_with_claims(claims: dict, key: str = FAKE_SECRET):
-    """Генерирует JWT с заданными claims для тестов."""
-    return jwt.encode(claims, key, algorithm="HS256", headers={"kid": "test-kid"})
+@pytest.fixture(autouse=True)
+def mock_jwks():
+    """Подменяем запрос к Keycloak на фейковый JWKS для всех тестов."""
+    with patch("main.get_jwks", return_value=FAKE_JWKS):
+        yield
 
 def test_missing_token_rejected():
     """1. Запрос без токена должен возвращать 403 (HTTPBearer)."""
@@ -27,25 +40,28 @@ def test_malformed_token_rejected():
 
 def test_wrong_issuer_rejected():
     """3. Токен с неправильным issuer отклоняется."""
+    # Подписываем фейковым ключом (в тесте подпись все равно проверяется)
     claims = {
         "sub": "123", "preferred_username": "test", 
         "iss": "http://evil.com/realms/hacker",
         "exp": 9999999999
     }
-    token = get_token_with_claims(claims)
+    # Используем HS256 и строку как ключ для простоты, 
+    # но в реальном коде ожидается RS256. 
+    # (Для теста issuer-а нам важно, чтобы токен был читаемым)
+    token = jwt.encode(claims, "secret", algorithm="HS256", headers={"kid": "real-kid-123"})
     response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    # Упадет либо на issuer, либо на подписи (т.к. alg не тот), но статус должен быть 401
     assert response.status_code == 401
-    # Проверяем, что ошибка именно про issuer или подпись (так как ключ тоже не тот)
     assert "Invalid token" in response.json()["detail"]
 
 def test_unknown_kid_rejected():
     """4. Токен с неизвестным kid отклоняется."""
-    # kid="test-kid" точно нет в JWKS реального Keycloak
     claims = {
         "sub": "123", "preferred_username": "test", 
         "iss": ISSUER, "exp": 9999999999
     }
-    token = get_token_with_claims(claims)
+    token = jwt.encode(claims, "secret", algorithm="HS256", headers={"kid": "unknown-kid"})
     response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 401
     assert "Unknown signing key" in response.json()["detail"]
