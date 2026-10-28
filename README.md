@@ -1,3 +1,5 @@
+A minimal FastAPI proxy for Keycloak demonstrating JWT validation, RBAC, and secret isolation.
+
 # IAM Proxy Service (Keycloak Integration Demo)
 
 ## Концепция
