@@ -61,32 +61,7 @@ Identity Provider (Keycloak) через слой проксирования. Ф�
 5.  Если проверки пройдены, прокси парсит payload и достает роли
     (`iam-user`) для дальнейшего контроля доступа (RBAC).
 
-## 3. Архитектурная схема (Workflow)
-
-``` text
-Клиент (Postman / Frontend)
-        |
-        | 1. POST /login {username, password}
-        v
-IAM Proxy (FastAPI)  <--- добавляет client_id и client_secret
-        |
-        | 2. POST /token (grant_type=password)
-        v
-Keycloak (IdP)       <--- проверяет хэш пароля в своей БД, подписывает JWT
-        |
-        | 3. JWT (access + refresh)
-        v
-IAM Proxy (FastAPI)  <--- отдает токен клиенту
-        |
-        | 4. JWT клиенту
-        v
-Клиент
-
-Далее:
-Клиент -> GET /me (Authorization: Bearer <access_token>)
-        -> IAM Proxy (берет публичный ключ из Keycloak, проверяет подпись JWT, извлекает роли)
-           -> возвращает identity-контекст
-```
+## 3.Схема взаимодействия (Workflow)
 
 ![Схема взаимодействия](sequence.png).
 
